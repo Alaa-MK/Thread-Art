@@ -3,10 +3,12 @@ import numpy as np
 import math
 import random
 
-W = 64
-H = 64
-THRESHOLD = 0.72
-DENSITY = 0.99
+#PARAMETERS
+W = 64                  #number of pins on the horizontal size
+H = 64                  #number of pins on the veritcal size
+THRESHOLD = 0.72        #minimum matching percentage for a line to be considered in drawing
+DENSITY = 0.99          #controls the density of the lines in the picture
+SCALING_FACTOR = 16     #the output image size is SCALING_FACTOR * input_image.size()
 
 def line_equation(line):    #assume slope is not infinite
     A, B = line
@@ -14,13 +16,13 @@ def line_equation(line):    #assume slope is not infinite
     c=A[1]-m*A[0]
     return m, c
 
-def line_probability(line, pixels):
-    cost = 0
+def line_gain(line, pixels):     #evaluates to a value between 0 and 1 indicating how matching a line is in this position
+    gain = 0
     count = 0
     if (line[0][0] == line[1][0]):
         for y in range(min(line[0][1], line[1][1]), max(line[0][1], line[1][1])):
             x = line[0][0]
-            cost+=255-pixels[x][y]
+            gain+=255-pixels[x][y]
             count+=1   
     else:
         m, c = line_equation(line)
@@ -28,22 +30,21 @@ def line_probability(line, pixels):
             y = math.floor(m*x+c)
             if y == len(pixels[0]):
                 continue
-            cost+=255-pixels[x][y]
+            gain+=255-pixels[x][y]
             count+=1
     if count == 0: 
         return 0
-    return cost/count/255   #gives a value in [0,1]
+    return gain/count/255
 
 def get_lines_to_draw(all_lines, pixels):
     to_draw = []
     for line in all_lines:
-        p = line_probability(line, pixels)
+        p = line_gain(line, pixels)
         if random.random() < p * DENSITY and p > THRESHOLD:
             to_draw.append(line)
     return to_draw
 
-def draw_image (lines_to_draw, size):
-    factor = 32
+def draw_image (lines_to_draw, size, factor):
     new_size = (size[0]*factor, size[1]*factor)
     img = Image.new('L', new_size)
     draw = ImageDraw.Draw(img)
@@ -57,8 +58,8 @@ def draw_image (lines_to_draw, size):
 
 
 def main():
-    img = Image.open('big.png').convert('L')
-#    img.show()
+    image_name = 'the-mona-lisa.jpg'
+    img = Image.open('examples/' + image_name).convert('L')
     img_width, img_height = img.size
     pixels = np.reshape(img.getdata(), img.size)
     
@@ -66,16 +67,13 @@ def main():
     + [(math.floor(x*img_width/W),img_height) for x in range(0, W)] \
     + [(0,math.floor(y*img_height/H)) for y in range(0, H)] \
     + [(img_width, math.floor(y*img_height/H)) for y in range(0, H)]
-    
-#    print(pins)
-    
-    lines = [(x,y) for x in pins for y in pins if not(x[0] == y[0] and x[0] in(0, img_width)) and not(x[1]==y[1] and x[1] in (0, img_height))]
-#    print(lines)
-    
+        
+    lines = [(x,y) for x in pins for y in pins if not(x[0] == y[0] and x[0] in(0, img_width)) and not(x[1]==y[1] and x[1] in (0, img_height))]    
     lines_to_draw = get_lines_to_draw(lines, pixels)
     print(len(lines_to_draw))
-    result = draw_image(lines_to_draw, img.size)
+    result = draw_image(lines_to_draw, img.size, SCALING_FACTOR)
     result.show()
+    result.save(image_name[:image_name.rfind('.')] + "(thread art).BMP")
     
     
     
